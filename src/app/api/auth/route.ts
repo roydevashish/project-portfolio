@@ -1,4 +1,4 @@
-import { currentUser, auth } from '@clerk/nextjs/server'
+import { currentUser, auth, clerkClient } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import DBConnect from '@/lib/DB';
 import UserModel from '@/models/User.model';
@@ -15,9 +15,9 @@ export async function GET() {
   const emailId = user?.emailAddresses[0].emailAddress;
 
   try {
-    DBConnect();
+    await DBConnect();
 
-    const userByEmailId = await UserModel.findOne({"email": emailId});
+    let userByEmailId = await UserModel.findOne({"email": emailId});
     if(!userByEmailId) {
       const temp_username = uuidv4().replace(/-/g, '');
 
@@ -26,9 +26,17 @@ export async function GET() {
         username: temp_username
       });
 
-      const savedUser = await newUser.save();
-      console.log(savedUser)
+      userByEmailId = await newUser.save();
     }
+
+    const client = await clerkClient()
+    await client.users.updateUserMetadata(userId, {
+      privateMetadata: {
+        id: userByEmailId._id,
+        email: userByEmailId.email,
+        username: userByEmailId.username
+      },
+    })
   } catch(error) {
     console.log(error);
   }
